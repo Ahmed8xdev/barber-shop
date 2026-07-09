@@ -1,0 +1,94 @@
+@import "tailwindcss";
+
+:root {
+  --background: #FFFFFF;
+  --foreground: #120E0B;
+  --bronze: #C5A880;
+  --bronze-dark: #A3805B;
+  --espresso-dark: #F9F9F8;
+  --espresso-light: #F3F1ED;
+  --sand-muted: #6B6661;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-bronze: var(--bronze);
+  --color-bronze-dark: var(--bronze-dark);
+  --color-espresso-dark: var(--espresso-dark);
+  --color-espresso-light: var(--espresso-light);
+  --color-sand-muted: var(--sand-muted);
+  
+  --font-serif: var(--font-caveat), cursive;
+  --font-sans: var(--font-inter), sans-serif;
+  --font-arabic-heading: var(--font-aref-ruqaa), serif;
+  --font-arabic-body: var(--font-tajawal), sans-serif;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+}
+
+/* Localized Font Handlers - All Handwriting Refactor */
+.font-english {
+  font-family: var(--font-serif), cursive;
+  font-size: 1.15rem; /* Scale baseline slightly to support handwriting spacing */
+  letter-spacing: 0.01em;
+}
+
+.font-english h1,
+.font-english h2,
+.font-english h3,
+.font-english h4 {
+  font-family: var(--font-serif), cursive;
+}
+
+.font-arabic {
+  font-family: var(--font-arabic-heading), serif;
+  font-size: 1.2rem;
+  line-height: 1.8;
+}
+
+.font-arabic h1,
+.font-arabic h2,
+.font-arabic h3,
+.font-arabic h4 {
+  font-family: var(--font-arabic-heading), serif;
+}
+
+/* GSAP and Custom transitions / tilt helpers */
+.bronze-glow {
+  box-shadow: 0 4px 20px rgba(197, 168, 128, 0.08);
+}
+
+.bronze-glow-hover:hover {
+  box-shadow: 0 10px 30px rgba(197, 168, 128, 0.15);
+  border-color: var(--bronze);
+}
+
+/* GSAP reveal states */
+.gsap-reveal {
+  opacity: 0;
+  transform: translateY(30px);
+}
+
+/* Hide scrollbar utility */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* 3D Transform Space Helpers */
+.perspective-container {
+  perspective: 1200px;
+  transform-style: preserve-3d;
+}
+
+.preserve-3d {
+  transform-style: preserve-3d;
+}
+
