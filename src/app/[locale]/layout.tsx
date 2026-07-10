@@ -29,7 +29,6 @@ export const metadata: Metadata = {
   description: "Explore the worldwide database of luxury haircuts, beard sculpting, and VIP pricing packages at THE BARON Lounge.",
 };
 
-import GsapInit from "@/components/GsapInit";
 import LenisProvider from "@/components/LenisProvider";
 import PageTransition from "@/components/PageTransition";
 import CustomCursor from "@/components/CustomCursor";
@@ -53,7 +52,6 @@ export default async function LocaleLayout({
   return (
     <html lang={locale} dir={dir} className={`${fontClasses} h-full antialiased`}>
       <body className="min-h-full flex flex-col bg-white text-[#120E0B] selection:bg-[#C5A880]/30 selection:text-[#120E0B]">
-        <GsapInit />
         <CustomCursor />
         <LoadingScreen />
         <ScrollProgress />

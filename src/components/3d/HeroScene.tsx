@@ -3,6 +3,7 @@
 import SceneCanvas from "./SceneCanvas";
 import ParticleField from "./ParticleField";
 import FloatingScissors from "./FloatingScissors";
+import BarberPole from "./BarberPole";
 import CameraPath from "./CameraPath";
 
 export default function HeroScene() {
@@ -11,6 +12,7 @@ export default function HeroScene() {
       <CameraPath />
       <ParticleField />
       <FloatingScissors />
+      <BarberPole />
     </SceneCanvas>
   );
 }

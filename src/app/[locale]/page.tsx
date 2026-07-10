@@ -32,16 +32,16 @@ export default async function HomePage({
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(197,168,128,0.06)_0%,transparent_70%)]" />
 
           <div className="absolute inset-x-0 top-0 h-px bg-bronze/10" />
-          <div className="absolute inset-y-0 left-1/4 w-px bg-bronze/5 hidden lg:block" />
-          <div className="absolute inset-y-0 right-1/4 w-px bg-bronze/5 hidden lg:block" />
+          <div className="absolute inset-y-0 left-1/4 w-px bg-bronze/5 hidden lg:block" data-parallax-speed="0.4" />
+          <div className="absolute inset-y-0 right-1/4 w-px bg-bronze/5 hidden lg:block" data-parallax-speed="-0.3" />
 
           <div className="relative z-10 mx-auto max-w-4xl space-y-8">
-            <div className="inline-flex items-center gap-2 rounded-full border border-bronze/20 bg-espresso-dark px-4 py-1.5 text-xs font-bold uppercase tracking-widest text-bronze gsap-reveal">
+            <div className="inline-flex items-center gap-2 rounded-full border border-bronze/20 bg-espresso-dark px-4 py-1.5 text-xs font-bold uppercase tracking-widest text-bronze gsap-reveal" data-float>
               <Globe className="h-3.5 w-3.5" />
               <span>{locale === "ar" ? "قاعدة بيانات عالمية لتصميمات الشعر" : "Global Haircut Database"}</span>
             </div>
 
-            <h1 className="text-5xl font-bold tracking-tight sm:text-7xl lg:text-8xl leading-none text-foreground gsap-reveal">
+            <h1 className="text-5xl font-bold tracking-tight sm:text-7xl lg:text-8xl leading-none text-foreground gsap-reveal" data-parallax-speed="0.15">
               {locale === "ar" ? "أسعار وتصميمات الشعر حول العالم" : "Worldwide Haircut Prices & Styles"}
             </h1>
 
@@ -73,8 +73,8 @@ export default async function HomePage({
             <div className="grid grid-cols-1 gap-12 lg:grid-cols-2 lg:items-center">
 
               <div className="space-y-6">
-                <div className="h-1 w-12 bg-bronze" />
-                <h2 className="text-4xl font-bold tracking-tight sm:text-5xl gsap-reveal">
+                <div className="h-1 w-12 bg-bronze" data-parallax-speed="0.2" />
+                <h2 className="text-4xl font-bold tracking-tight sm:text-5xl gsap-reveal" data-parallax-speed="0.1">
                   {locale === "ar" ? "قاعدة بيانات عالمية فورية" : "Live Global Price Database"}
                 </h2>
                 <p className="text-base leading-relaxed text-sand-muted gsap-reveal">
