@@ -10,11 +10,10 @@ export async function GET() {
       youtube: data.youtube,
       fetchedAt: data.fetchedAt,
     });
-  } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : "Trends fetch failed";
+  } catch {
     return NextResponse.json(
-      { success: false, error: msg },
-      { status: 502 }
+      { success: false, error: "Trends fetch failed" },
+      { status: 200 }
     );
   }
 }

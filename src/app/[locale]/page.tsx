@@ -1,7 +1,7 @@
 import { getTranslations } from "@/lib/translations";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import HeroParticles from "@/components/3d/HeroParticles";
+import HeroSceneWrapper from "@/components/HeroSceneWrapper";
 import PriceDatabaseClient from "@/components/PriceDatabaseClient";
 import TrendsSection from "@/components/TrendsSection";
 import TestimonialsSection from "@/components/TestimonialsSection";
@@ -28,7 +28,7 @@ export default async function HomePage({
       <main className="flex-grow pb-20 md:pb-0 bg-white relative z-10">
 
         <section className="relative flex min-h-[95vh] items-center justify-center overflow-hidden bg-white px-4 py-32 text-center">
-          <HeroParticles />
+          <HeroSceneWrapper />
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(197,168,128,0.06)_0%,transparent_70%)]" />
 
           <div className="absolute inset-x-0 top-0 h-px bg-bronze/10" />

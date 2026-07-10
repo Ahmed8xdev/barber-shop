@@ -32,6 +32,9 @@ export const metadata: Metadata = {
 import GsapInit from "@/components/GsapInit";
 import LenisProvider from "@/components/LenisProvider";
 import PageTransition from "@/components/PageTransition";
+import CustomCursor from "@/components/CustomCursor";
+import LoadingScreen from "@/components/LoadingScreen";
+import ScrollProgress from "@/components/ScrollProgress";
 
 export default async function LocaleLayout({
   children,
@@ -51,6 +54,9 @@ export default async function LocaleLayout({
     <html lang={locale} dir={dir} className={`${fontClasses} h-full antialiased`}>
       <body className="min-h-full flex flex-col bg-white text-[#120E0B] selection:bg-[#C5A880]/30 selection:text-[#120E0B]">
         <GsapInit />
+        <CustomCursor />
+        <LoadingScreen />
+        <ScrollProgress />
         <LenisProvider>
           <PageTransition>
             {children}
