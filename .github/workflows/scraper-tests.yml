@@ -1,0 +1,37 @@
+name: Scraper reliability tests
+
+on:
+  pull_request:
+    paths:
+      - 'src/lib/scraper/http-client.ts'
+      - 'src/lib/scraper/rate-limiter.ts'
+      - 'tests/scraper-retries.test.cjs'
+      - '.github/workflows/scraper-tests.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/lib/scraper/http-client.ts'
+      - 'src/lib/scraper/rate-limiter.ts'
+      - 'tests/scraper-retries.test.cjs'
+      - '.github/workflows/scraper-tests.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies without package scripts
+        run: npm ci --ignore-scripts
+      - name: Test rate limiting and HTTP retry behavior
+        run: node --test tests/scraper-retries.test.cjs
