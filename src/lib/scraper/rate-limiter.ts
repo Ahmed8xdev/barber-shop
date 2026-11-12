@@ -35,6 +35,9 @@ export class RateLimiter {
   constructor(customBudgets?: Record<string, { rpm: number; concurrent: number }>) {
     const merged = { ...DEFAULT_BUDGETS, ...customBudgets };
     for (const [domain, config] of Object.entries(merged)) {
+      if (!Number.isInteger(config.rpm) || config.rpm < 1 || !Number.isInteger(config.concurrent) || config.concurrent < 1) {
+        throw new RangeError(`Invalid request budget for ${domain}`);
+      }
       this.budgets.set(domain, {
         domain,
         maxRequestsPerMinute: config.rpm,
@@ -46,33 +49,45 @@ export class RateLimiter {
   }
 
   private getBudget(domain: string): DomainBudget {
-    return this.budgets.get(domain) || this.budgets.get('default')!;
+    const existing = this.budgets.get(domain);
+    if (existing) return existing;
+
+    // Unrecognized domains inherit the default limits, not its mutable counters.
+    const defaults = this.budgets.get('default')!;
+    const budget: DomainBudget = {
+      domain,
+      maxRequestsPerMinute: defaults.maxRequestsPerMinute,
+      maxConcurrent: defaults.maxConcurrent,
+      requestTimestamps: [],
+      concurrentCount: 0,
+    };
+    this.budgets.set(domain, budget);
+    return budget;
   }
 
   async acquire(domain: string): Promise<void> {
     const budget = this.getBudget(domain);
-    const now = Date.now();
 
     while (true) {
+      // Advance the clock after every sleep or the quota window can never expire.
+      const now = Date.now();
       budget.requestTimestamps = budget.requestTimestamps.filter(t => now - t < 60000);
-
-      if (budget.requestTimestamps.length >= budget.maxRequestsPerMinute) {
-        const oldest = budget.requestTimestamps[0];
-        const waitMs = 60000 - (now - oldest) + 100;
-        await this.sleep(waitMs);
-        continue;
-      }
 
       if (budget.concurrentCount >= budget.maxConcurrent) {
         await this.sleep(200);
         continue;
       }
 
-      break;
-    }
+      if (budget.requestTimestamps.length >= budget.maxRequestsPerMinute) {
+        const oldest = budget.requestTimestamps[0];
+        await this.sleep(Math.max(1, 60000 - (now - oldest) + 100));
+        continue;
+      }
 
-    budget.requestTimestamps.push(now);
-    budget.concurrentCount++;
+      budget.requestTimestamps.push(now);
+      budget.concurrentCount++;
+      return;
+    }
   }
 
   release(domain: string): void {

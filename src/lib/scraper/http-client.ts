@@ -21,45 +21,54 @@ export class HttpClient {
 
   async fetch<T = string>(
     url: string,
-    options: { raw?: boolean; timeoutMs?: number } = {}
+    options: { raw?: boolean; timeoutMs?: number; maxRetries?: number } = {}
   ): Promise<{ ok: boolean; status: number; data: T }> {
     const domain = new URL(url).hostname;
-    await this.rateLimiter.acquire(domain);
+    // Every request gets a bounded number of attempts to avoid unending recursion.
+    const maxRetries = Math.min(3, Math.max(0, Math.trunc(options.maxRetries ?? 2)));
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), options.timeoutMs || 15000);
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      await this.rateLimiter.acquire(domain);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? 15000);
+      let retryableResponse = false;
 
-    try {
-      const res = await fetch(url, {
-        headers: buildHeaders(),
-        signal: controller.signal,
-        redirect: 'follow',
-      });
+      try {
+        const res = await fetch(url, {
+          headers: buildHeaders(),
+          signal: controller.signal,
+          redirect: 'follow',
+        });
 
-      if (!res.ok) {
-        this.rateLimiter.release(domain);
-        if (res.status === 429 || res.status === 503) {
-          const backoff = this.rateLimiter.recordBackoff(domain);
-          await new Promise(r => setTimeout(r, backoff));
-          return this.fetch(url, options);
+        if (res.ok) {
+          // Keep the slot acquired until the response body has been consumed.
+          const data = options.raw ? (await res.text()) as unknown as T : (await res.json()) as T;
+          this.rateLimiter.resetBackoff(domain);
+          return { ok: true, status: res.status, data };
         }
-        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+
+        retryableResponse = res.status === 429 || res.status === 503;
+        if (!retryableResponse || attempt === maxRetries) {
+          throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+        }
+      } catch (err: unknown) {
+        if (err instanceof Error && err.name === 'AbortError') {
+          throw new Error(`Timeout fetching ${url}`);
+        }
+        throw err;
+      } finally {
+        clearTimeout(timeout);
+        // Release exactly once, including failures and JSON parsing errors.
+        this.rateLimiter.release(domain);
       }
 
-      this.rateLimiter.resetBackoff(domain);
-      this.rateLimiter.release(domain);
-
-      const data = options.raw ? (await res.text()) as unknown as T : (await res.json()) as T;
-      return { ok: true, status: res.status, data };
-    } catch (err: unknown) {
-      this.rateLimiter.release(domain);
-      if (err instanceof Error && err.name === 'AbortError') {
-        throw new Error(`Timeout fetching ${url}`);
+      if (retryableResponse) {
+        this.rateLimiter.recordBackoff(domain);
+        await this.rateLimiter.waitWithJitter(domain);
       }
-      throw err;
-    } finally {
-      clearTimeout(timeout);
     }
+
+    throw new Error(`Retry budget exhausted fetching ${url}`);
   }
 
   async fetchJSON<T>(url: string): Promise<T> {
