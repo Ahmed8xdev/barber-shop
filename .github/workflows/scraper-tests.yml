@@ -3,24 +3,16 @@ name: Scraper reliability tests
 on:
   pull_request:
     paths:
-      - 'src/lib/scraper/http-client.ts'
-      - 'src/lib/scraper/rate-limiter.ts'
-      - 'src/lib/scraper/index.ts'
-      - 'src/lib/scraper/haircut-request.ts'
-      - 'src/app/api/haircuts/route.ts'
-      - 'tests/haircut-request.test.cjs'
-      - 'tests/scraper-retries.test.cjs'
+      - 'src/lib/scraper/**'
+      - 'src/app/api/**'
+      - 'tests/**'
       - '.github/workflows/scraper-tests.yml'
   push:
     branches: [main]
     paths:
-      - 'src/lib/scraper/http-client.ts'
-      - 'src/lib/scraper/rate-limiter.ts'
-      - 'src/lib/scraper/index.ts'
-      - 'src/lib/scraper/haircut-request.ts'
-      - 'src/app/api/haircuts/route.ts'
-      - 'tests/haircut-request.test.cjs'
-      - 'tests/scraper-retries.test.cjs'
+      - 'src/lib/scraper/**'
+      - 'src/app/api/**'
+      - 'tests/**'
       - '.github/workflows/scraper-tests.yml'
   workflow_dispatch:
 
@@ -42,4 +34,4 @@ jobs:
       - name: Install locked dependencies without package scripts
         run: npm ci --ignore-scripts
       - name: Test rate limiting and HTTP retry behavior
-        run: node --test tests/scraper-retries.test.cjs tests/haircut-request.test.cjs
+        run: node --test tests/*.test.cjs
