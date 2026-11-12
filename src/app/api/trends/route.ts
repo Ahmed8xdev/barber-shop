@@ -13,7 +13,7 @@ export async function GET() {
   } catch {
     return NextResponse.json(
       { success: false, error: "Trends fetch failed" },
-      { status: 200 }
+      { status: 502 }
     );
   }
 }
