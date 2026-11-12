@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { createHash } from 'node:crypto';
 
 interface CacheEntry<T = unknown> {
   data: T;
@@ -45,9 +46,11 @@ export class ScraperCache {
     } catch {}
   }
 
-  private getFilePath(namespace: string): string {
-    const safe = namespace.replace(/[^a-zA-Z0-9_-]/g, '_');
-    return path.join(this.config.persistDir, `${safe}.json`);
+  private getFilePath(key: string): string {
+    // Keep distinct keys distinct on disk, even if they include slashes,
+    // punctuation or other characters unsafe for filenames.
+    const digest = createHash('sha256').update(key).digest('hex');
+    return path.join(this.config.persistDir, `cache_${digest}.json`);
   }
 
   get<T>(key: string): { data: T; stale: boolean; source: string } | null {
@@ -55,7 +58,7 @@ export class ScraperCache {
     if (!entry) return null;
     const now = Date.now();
     if (now > entry.expiresAt && now > entry.staleAt) {
-      this.store.delete(key);
+      this.delete(key);
       return null;
     }
     return {
@@ -67,7 +70,8 @@ export class ScraperCache {
 
   set<T>(key: string, data: T, source: string, ttlMs?: number): void {
     const now = Date.now();
-    const ttl = ttlMs || this.config.defaultTtlMs;
+    const ttl = ttlMs ?? this.config.defaultTtlMs;
+    if (!Number.isFinite(ttl) || ttl <= 0) throw new RangeError('Cache TTL must be a positive duration');
     const staleTtl = ttl + this.config.staleTtlMs;
     const entry: CacheEntry<T> = {
       data,
@@ -79,7 +83,7 @@ export class ScraperCache {
 
     if (this.store.size >= this.config.maxEntries) {
       const oldest = this.store.entries().next().value;
-      if (oldest) this.store.delete(oldest[0]);
+      if (oldest) this.delete(oldest[0]);
     }
 
     this.store.set(key, entry);
@@ -93,29 +97,41 @@ export class ScraperCache {
     if (typeof process === 'undefined') return;
     try {
       const filePath = this.getFilePath(key);
-      fs.writeFileSync(filePath, JSON.stringify(entry, null, 0), 'utf-8');
+      fs.writeFileSync(filePath, JSON.stringify({ key, entry }), 'utf-8');
     } catch {}
   }
 
   private loadFromDisk(): void {
-    if (typeof process === 'undefined') return;
     try {
       const dir = this.config.persistDir;
       if (!fs.existsSync(dir)) return;
-      const files = fs.readdirSync(dir);
-      for (const file of files) {
-        if (!file.endsWith('.json')) continue;
+      for (const file of fs.readdirSync(dir)) {
+        // Legacy filenames lost the original key, and cannot be restored safely.
+        if (!/^cache_[a-f0-9]{64}\.json$/.test(file)) continue;
+        const full = path.join(dir, file);
         try {
-          const content = fs.readFileSync(path.join(dir, file), 'utf-8');
-          const entry: CacheEntry = JSON.parse(content);
-          const key = file.replace('.json', '');
-          const now = Date.now();
-          if (now < entry.staleAt) {
-            this.store.set(key, entry);
-          } else {
-            fs.unlinkSync(path.join(dir, file));
+          const record = JSON.parse(fs.readFileSync(full, 'utf8')) as {
+            key?: unknown;
+            entry?: CacheEntry;
+          };
+          if (typeof record.key !== 'string' || !record.entry ||
+              !Number.isFinite(record.entry.staleAt) ||
+              !Number.isFinite(record.entry.expiresAt) ||
+              record.entry.expiresAt > record.entry.staleAt ||
+              file !== path.basename(this.getFilePath(record.key))) {
+            fs.unlinkSync(full);
+            continue;
           }
-        } catch {}
+          if (Date.now() >= record.entry.staleAt) {
+            fs.unlinkSync(full);
+            continue;
+          }
+          if (this.store.size >= this.config.maxEntries) break;
+          this.store.set(record.key, record.entry);
+        } catch {
+          // Corrupted cache entries should never block the application.
+          try { fs.unlinkSync(full); } catch {}
+        }
       }
     } catch {}
   }
@@ -138,7 +154,7 @@ export class ScraperCache {
         if (fs.existsSync(dir)) {
           const files = fs.readdirSync(dir);
           for (const file of files) {
-            if (file.endsWith('.json')) fs.unlinkSync(path.join(dir, file));
+            if (/^cache_[a-f0-9]{64}\.json$/.test(file)) fs.unlinkSync(path.join(dir, file));
           }
         }
       } catch {}
