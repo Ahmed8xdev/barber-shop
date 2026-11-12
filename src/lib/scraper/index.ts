@@ -121,15 +121,9 @@ export async function getHaircuts(options: {
   const wikiResult = await fetchHairstyles(options.cmcontinue);
   if (wikiResult.styles.length > 0) sources.push(wikiResult.source);
 
-  try {
-    const wikidataStyles = await fetchWikidataStyles();
-    if (wikidataStyles.length > 0) sources.push('wikidata');
-  } catch {}
-
-  try {
-    const ratesData = await getExchangeRates();
-    sources.push(ratesData.source);
-  } catch {}
+  // Haircut generation below consumes only Wikipedia styles and images.
+  // Exchange rates are fetched independently by the public API route;
+  // calling them here adds upstream latency without affecting haircut data.
 
   const allStyles: HaircutItem[] = [];
 
