@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { getTranslations } from "@/lib/translations";
 import { getCalculatedPrice } from "@/lib/data";
+import { appendUniqueById, nextPageCursor } from "@/lib/haircut-pagination";
 import { parseBookingNumber } from "@/lib/booking-number";
 import { Search, Globe, Filter, MessageSquare, Coins, Loader, ArrowUpDown, Tag } from "lucide-react";
 
@@ -154,9 +155,10 @@ export default function PriceDatabaseClient({ locale }: PriceDatabaseClientProps
       if (!res.ok) return false;
       const payload = await res.json();
       if (payload.success && payload.haircuts?.length > 0) {
-        setAllHaircuts(prev => [...prev, ...payload.haircuts]);
-        setNextContinue(payload.nextContinue || "");
-        if (!payload.nextContinue) setNoMoreData(true);
+        setAllHaircuts(prev => appendUniqueById(prev, payload.haircuts));
+        const nextCursor = nextPageCursor(cursor, payload.nextContinue, payload.haircuts.length);
+        setNextContinue(nextCursor);
+        if (!nextCursor) setNoMoreData(true);
         return true;
       } else {
         setNoMoreData(true);
