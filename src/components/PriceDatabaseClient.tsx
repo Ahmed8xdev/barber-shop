@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { getTranslations } from "@/lib/translations";
 import { getCalculatedPrice } from "@/lib/data";
+import { getUsdRate } from "@/lib/currency-rates";
 import { appendUniqueById, nextPageCursor } from "@/lib/haircut-pagination";
 import { parseBookingNumber } from "@/lib/booking-number";
 import { Search, Globe, Filter, MessageSquare, Coins, Loader, ArrowUpDown, Tag } from "lucide-react";
@@ -96,8 +97,14 @@ export default function PriceDatabaseClient({ locale }: PriceDatabaseClientProps
     fetchAPI();
   }, [locale]);
 
-  const currentCountry = countries.find((c: CountryInfo) => c.code === selectedCountryCode) || countries[0] || { code: "US", symbol: "$", currency: "USD", name: { en: "United States", ar: "الولايات المتحدة" } };
-  const activeRate = rates ? (rates[currentCountry.currency] || 1.0) : 1.0;
+  const supportedCountries = useMemo(() => {
+    const available = countries.filter((c: CountryInfo) => getUsdRate(c.currency, rates) !== null);
+    return available.length > 0 ? available : [
+      { code: "US", symbol: "$", currency: "USD", name: { en: "United States", ar: "الولايات المتحدة" } }
+    ];
+  }, [countries, rates]);
+  const currentCountry = supportedCountries.find(c => c.code === selectedCountryCode) || supportedCountries[0];
+  const activeRate = getUsdRate(currentCountry.currency, rates) ?? 1;
 
   const filteredServices = useMemo(() => {
     let items = allHaircuts;
@@ -236,22 +243,26 @@ export default function PriceDatabaseClient({ locale }: PriceDatabaseClientProps
             <span>{t.database.selectCountry}</span>
           </label>
           <select
-            value={selectedCountryCode}
+            value={currentCountry.code}
             onChange={(e) => {
               setSelectedCountryCode(e.target.value);
-              const targetCountry = countries.find((c: CountryInfo) => c.code === e.target.value);
-              const rate = rates ? (rates[targetCountry?.currency || "USD"] || 1.0) : 1.0;
+              const targetCountry = supportedCountries.find((c: CountryInfo) => c.code === e.target.value);
+              const rate = getUsdRate(targetCountry?.currency || "USD", rates) ?? 1;
               setMaxBudget(Math.round(150 * rate));
             }}
             className="w-full bg-white border border-bronze/10 rounded-sm px-4 py-3 text-sm font-bold text-foreground focus:outline-none focus:border-bronze cursor-pointer"
           >
-            {countries.length === 0 && <option value="US">$ - United States (USD)</option>}
-            {countries.map((c: CountryInfo) => (
+            {supportedCountries.map((c: CountryInfo) => (
               <option key={c.code} value={c.code}>
                 {c.symbol} - {c.name?.[locale] || c.name?.en || c.code} ({c.currency})
               </option>
             ))}
           </select>
+          {!rates && (
+            <p role="status" className="mt-2 text-xs text-sand-muted">
+              {locale === "ar" ? "تحويل العملات غير متاح مؤقتاً؛ الأسعار المعروضة بالدولار الأمريكي فقط." : "Currency conversion is temporarily unavailable. USD prices only."}
+            </p>
+          )}
         </div>
 
         <div className="space-y-2">
@@ -434,8 +445,8 @@ export default function PriceDatabaseClient({ locale }: PriceDatabaseClientProps
                         <span className="text-center">{t.database.exchangeRate}</span>
                         <span className="text-right">Price</span>
                       </div>
-                      {countries.map((c: CountryInfo) => {
-                        const localMultiplier = rates ? (rates[c.currency] || 1.0) : 1.0;
+                      {supportedCountries.map((c: CountryInfo) => {
+                        const localMultiplier = getUsdRate(c.currency, rates) ?? 1;
                         const localRate = getCalculatedPrice(service.basePriceUSD, localMultiplier, 1.0);
                         return (
                           <div key={c.code} className="grid grid-cols-3 text-xs font-semibold py-2 items-center">
