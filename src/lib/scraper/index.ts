@@ -1,4 +1,5 @@
 import { defaultCache } from './cache';
+import { createHash } from 'node:crypto';
 import { getExchangeRates } from './sources/exchange-rates';
 import { fetchHairstyles } from './sources/wikipedia';
 import { fetchWikidataStyles } from './sources/wikidata';
@@ -101,7 +102,17 @@ export async function getHaircuts(options: {
   limit?: number;
   cmcontinue?: string;
 }): Promise<HaircutsResult & { nextContinue?: string }> {
-  const cacheKey = `haircuts_all_${options.page || 1}_${options.cmcontinue || ''}`;
+  // The previous cache key ignored query, category and limit, so a filtered
+  // request could receive another visitor's cached results. Hash the complete
+  // request tuple into a fixed-length, filesystem-safe key.
+  const requestIdentity = JSON.stringify([
+    options.page ?? 1,
+    options.limit ?? 15,
+    options.cmcontinue ?? '',
+    options.query ?? '',
+    options.category ?? '',
+  ]);
+  const cacheKey = 'haircuts_v2_' + createHash('sha256').update(requestIdentity).digest('hex');
   const cached = defaultCache.get<HaircutsResult>(cacheKey);
   if (cached && !cached.stale) return { ...cached.data, nextContinue: cached.data.nextContinue || '' };
 
