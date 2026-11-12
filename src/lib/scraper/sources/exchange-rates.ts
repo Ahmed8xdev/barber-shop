@@ -1,5 +1,6 @@
 import { defaultHttpClient } from '../http-client';
 import { defaultCache } from '../cache';
+import { parseUsdRates } from '@/lib/currency-rates';
 
 const CACHE_KEY = 'exchange_rates_usd';
 const CACHE_TTL_MS = 3600_000;
@@ -7,6 +8,7 @@ const CACHE_TTL_MS = 3600_000;
 interface RateResponse {
   rates: Record<string, number>;
   base?: string;
+  base_code?: string;
 }
 
 interface ExchangeRateResult {
@@ -45,8 +47,8 @@ export async function getExchangeRates(): Promise<ExchangeRateResult> {
   for (const source of SOURCES) {
     try {
       const data = await defaultHttpClient.fetchJSON<RateResponse>(source.url);
-      const rates = source.parser(data);
-      if (rates && typeof rates === 'object' && Object.keys(rates).length > 10) {
+      const rates = parseUsdRates(source.parser(data), data.base || data.base_code);
+      if (rates) {
         const result: ExchangeRateResult = {
           rates,
           base: 'USD',
@@ -62,14 +64,6 @@ export async function getExchangeRates(): Promise<ExchangeRateResult> {
   const stale = defaultCache.get<ExchangeRateResult>(CACHE_KEY);
   if (stale) return stale.data;
 
-  return {
-    rates: {
-      USD: 1, AED: 3.67, SAR: 3.75, GBP: 0.78, EUR: 0.92,
-      JPY: 155.0, TRY: 32.5, CAD: 1.37, AUD: 1.51, EGP: 48.5,
-      KWD: 0.31, QAR: 3.64, BHD: 0.38, OMR: 0.38, PKR: 278.0,
-    },
-    base: 'USD',
-    fetchedAt: Date.now(),
-    source: 'fallback',
-  };
+  // Do not invent current exchange rates when all live providers fail.
+  throw new Error('Verified exchange rates are temporarily unavailable');
 }
