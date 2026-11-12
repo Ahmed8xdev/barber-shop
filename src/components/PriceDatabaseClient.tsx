@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { getTranslations } from "@/lib/translations";
 import { getCalculatedPrice } from "@/lib/data";
+import { parseBookingNumber } from "@/lib/booking-number";
 import { Search, Globe, Filter, MessageSquare, Coins, Loader, ArrowUpDown, Tag } from "lucide-react";
 
 interface CountryInfo {
@@ -181,13 +182,26 @@ export default function PriceDatabaseClient({ locale }: PriceDatabaseClientProps
   };
 
   const handleWhatsAppBooking = (serviceName: string) => {
-    const whatsappNum = locale === "ar" ? "+966551112233" : "+971508889900";
-    const svc = allHaircuts.find((h: HaircutItem) => (h.name?.en || h.name?.[locale]) === serviceName);
-    const price = getCalculatedPrice(svc?.basePriceUSD || 40, activeRate, 1.0);
-    const text = locale === "ar"
+    const number = parseBookingNumber(process.env.NEXT_PUBLIC_BOOKING_WHATSAPP);
+    if (!number) {
+      setError(locale === "ar"
+        ? "رقم التواصل للحجز غير مُعد حالياً. يرجى التواصل مع النشاط التجاري مباشرة."
+        : "Booking contact is not configured. Please contact the business directly.");
+      return;
+    }
+
+    const service = allHaircuts.find(h => (h.name?.en || h.name?.[locale]) === serviceName);
+    if (!service) {
+      setError(locale === "ar" ? "الخدمة المطلوبة غير متاحة." : "Selected service is unavailable.");
+      return;
+    }
+
+    const price = getCalculatedPrice(service.basePriceUSD, activeRate, 1.0);
+    const message = locale === "ar"
       ? `مرحباً صالون ذا بارون، أود حجز موعد لخدمة: ${serviceName} بسعر: ${currentCountry.symbol} ${price}`
       : `Hi THE BARON, I'd like to book: ${serviceName} under the rates of: ${currentCountry.symbol} ${price}`;
-    window.open(`https://api.whatsapp.com/send?phone=${whatsappNum}&text=${encodeURIComponent(text)}`, "_blank");
+    const url = `https://api.whatsapp.com/send?phone=${number}&text=${encodeURIComponent(message)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
   };
 
   if (loading) {
