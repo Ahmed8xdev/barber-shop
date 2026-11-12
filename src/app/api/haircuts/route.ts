@@ -1,16 +1,19 @@
 import { NextResponse } from "next/server";
 import { getHaircuts, getExchangeRates, getCategoryNames } from "@/lib/scraper";
 import { fetchCountries } from "@/lib/scraper/sources/countries";
+import { parseHaircutRequestParameters } from "@/lib/scraper/haircut-request";
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const query = searchParams.get("query") || "";
-    const category = searchParams.get("category") || "";
-    const page = parseInt(searchParams.get("page") || "1", 10);
-    const limit = parseInt(searchParams.get("limit") || "15", 10);
-    const cmcontinue = searchParams.get("continue") || "";
-    const locale = searchParams.get("locale") || "en";
+    const parsed = parseHaircutRequestParameters(searchParams);
+    if (!parsed.ok) {
+      return NextResponse.json(
+        { success: false, error: parsed.error },
+        { status: 400 }
+      );
+    }
+    const { query, category, page, limit, cmcontinue, locale } = parsed.value;
 
     const [haircutsResult, ratesData, countries] = await Promise.all([
       getHaircuts({ query, category: category || undefined, page, limit, cmcontinue: cmcontinue || undefined }),
@@ -26,7 +29,7 @@ export async function GET(request: Request) {
       sources: haircutsResult.sources,
       nextContinue: haircutsResult.nextContinue || "",
       countries,
-      categories: getCategoryNames(locale as 'en' | 'ar'),
+      categories: getCategoryNames(locale),
       fetchedAt: Date.now(),
     });
 
