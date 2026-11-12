@@ -3,6 +3,7 @@ import { defaultCache } from '../cache';
 
 const CACHE_TTL_MS = 86400_000;
 const WIKI_API = 'https://en.wikipedia.org/w/api.php';
+const PAGE_SIZE = 30;
 
 interface WikiMember {
   pageid: number;
@@ -43,7 +44,7 @@ export async function fetchHairstyles(cmcontinue?: string): Promise<{
     format: 'json',
     list: 'categorymembers',
     cmtitle: 'Category:Hairstyles',
-    cmlimit: '50',
+    cmlimit: String(PAGE_SIZE),
     origin: '*',
     ...(cmcontinue ? { cmcontinue } : {}),
   });
@@ -64,7 +65,9 @@ export async function fetchHairstyles(cmcontinue?: string): Promise<{
       !m.title.toLowerCase().includes('category:')
     );
 
-    const styles = filtered.slice(0, 30).map((m: WikiMember) => ({
+    // Never silently truncate a larger API page: its continuation token
+    // points past every returned item, including items that were dropped.
+    const styles = filtered.map((m: WikiMember) => ({
       id: `wiki_${m.pageid}`,
       title: m.title,
       extract: '',
