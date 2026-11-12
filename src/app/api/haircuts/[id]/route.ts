@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getHaircuts, getExchangeRates } from "@/lib/scraper";
+import { getUsdRate } from "@/lib/currency-rates";
 
 export async function GET(
   request: Request,
@@ -31,11 +32,11 @@ export async function GET(
     ];
 
     const pricing = countries.map(c => {
-      const rate = ratesData?.rates?.[c.currency] || 1;
+      const rate = getUsdRate(c.currency, ratesData?.rates);
       return {
         country: c,
-        standardPrice: Math.round(haircut.basePriceUSD * rate / 5) * 5,
-        vipPrice: Math.round(haircut.basePriceUSD * 1.5 * rate / 5) * 5,
+        standardPrice: rate === null ? null : Math.round(haircut.basePriceUSD * rate / 5) * 5,
+        vipPrice: rate === null ? null : Math.round(haircut.basePriceUSD * 1.5 * rate / 5) * 5,
         exchangeRate: rate,
       };
     });
