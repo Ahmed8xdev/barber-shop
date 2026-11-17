@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Star, MessageCircle } from "lucide-react";
+import { MessageCircle } from "lucide-react";
 import gsap from "gsap";
 import TestimonialCarousel from "./TestimonialCarousel";
 
@@ -10,6 +10,7 @@ interface Testimonial {
   author: string;
   subreddit: string;
   score: number;
+  url?: string;
 }
 
 interface TestimonialsSectionProps {
@@ -71,13 +72,13 @@ function TestimonialCard({ t }: { t: Testimonial }) {
           <span className="font-bold text-sm">u/{t.author}</span>
         </div>
         <a
-          href={`https://reddit.com/r/${t.subreddit}`}
+          href={t.url || `https://www.reddit.com/r/${encodeURIComponent(t.subreddit)}`}
           target="_blank"
           rel="noopener noreferrer"
           className="text-[10px] text-sand-muted hover:text-bronze flex items-center gap-1"
         >
           <MessageCircle className="h-3 w-3" />
-          <span>r/{t.subreddit}</span>
+          <span>r/{t.subreddit} · source</span>
         </a>
       </div>
       <p className="text-sm leading-relaxed text-sand-muted/95 italic flex-1">
@@ -109,16 +110,14 @@ export default function TestimonialsSection({ locale }: TestimonialsSectionProps
     <section className="py-24 px-4 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-5xl">
         <div className="text-center space-y-4 mb-16">
-          <div className="flex justify-center gap-1 gsap-reveal">
-            {[...Array(5)].map((_, i) => (
-              <Star key={i} className="h-5 w-5 fill-bronze text-bronze" />
-            ))}
+          <div className="flex justify-center gsap-reveal">
+            <MessageCircle aria-hidden="true" className="h-6 w-6 text-bronze" />
           </div>
           <h2 className="text-4xl font-bold tracking-tight sm:text-5xl gsap-reveal">
-            {locale === "ar" ? "ماذا يقول المستخدمون" : "What Users Say"}
+            {locale === "ar" ? "مناقشات مجتمع العناية بالشعر" : "Grooming Community Discussions"}
           </h2>
           <p className="text-base text-sand-muted gsap-reveal">
-            {locale === "ar" ? "آراء حقيقية من مجتمع ريديت" : "Real feedback from the Reddit grooming community"}
+            {locale === "ar" ? "منشورات عامة من ريديت، وليست تقييمات لعملاء هذا النشاط التجاري." : "Public Reddit discussions, not customer reviews of this business."}
           </p>
         </div>
 
@@ -129,6 +128,10 @@ export default function TestimonialsSection({ locale }: TestimonialsSectionProps
               {locale === "ar" ? "جلب أحدث الآراء..." : "Fetching latest feedback..."}
             </p>
           </div>
+        ) : testimonials.length === 0 ? (
+          <p role="status" className="text-center text-sm text-sand-muted py-12">
+            {locale === "ar" ? "مناقشات المجتمع غير متاحة حالياً." : "Community posts are temporarily unavailable."}
+          </p>
         ) : (
           <TestimonialCarousel
             items={testimonials.map((t, i) => (
