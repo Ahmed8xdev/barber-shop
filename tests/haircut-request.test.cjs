@@ -74,6 +74,7 @@ function scraperFixtures() {
   ];
   const api = loadTS('src/lib/scraper/index.ts', {
     './cache': { defaultCache: fakeCache },
+    './concurrency': { mapWithConcurrency: async (items, count, fn) => Promise.all(items.map(fn)) },
     './sources/exchange-rates': { getExchangeRates: async () => ({ source: 'fixture', rates: { USD: 1 } }) },
     './sources/wikipedia': {
       fetchHairstyles: async () => {

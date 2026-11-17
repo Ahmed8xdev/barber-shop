@@ -10,6 +10,7 @@ test('haircut generation does not contact unrelated data providers',async()=>{
  mod.filename=file;
  mod.require=id=>{
   if(id==='./cache')return {defaultCache:{get:()=>null,set:()=>{}}};
+  if(id==='./concurrency')return {mapWithConcurrency:async(items,count,fn)=>Promise.all(items.map(fn))};
   if(id==='./sources/wikipedia')return {fetchHairstyles:async()=>{wikiCalls++;return {styles:[{title:'Afro',id:'w1',extract:'Short hair',imageUrl:'x'}],source:'Wikipedia',nextContinue:''}}};
   if(id==='./sources/wikidata')return {fetchWikidataStyles:async()=>{wikidataCalls++;return []}};
   if(id==='./sources/exchange-rates')return {getExchangeRates:async()=>{rateCalls++;return {source:'rates',rates:{USD:1}}}};
