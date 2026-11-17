@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { getTranslations } from "@/lib/translations";
 import { getCalculatedPrice } from "@/lib/data";
+import { parseBookingNumber } from "@/lib/booking-number";
+import { getUsdRate } from "@/lib/currency-rates";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Search, Clock, MessageSquare, ChevronRight, Loader } from "lucide-react";
@@ -61,7 +63,11 @@ export default function ServicesClient({ locale }: ServicesClientProps) {
     fetchData();
   }, [locale]);
 
-  const defaultCountry = countries.find((c: CountryInfo) => c.code === defaultCountryCode) || countries[0] || { code: "AE", symbol: "AED", currency: "AED", exchangeRate: 3.67 };
+  const supportedCountries = countries.filter((c: CountryInfo) => getUsdRate(c.currency, rates) !== null);
+  const defaultCountry = supportedCountries.find(c => c.code === defaultCountryCode)
+    || supportedCountries[0]
+    || { code: "US", symbol: "$", currency: "USD", name: { en: "United States", ar: "الولايات المتحدة" } };
+  const bookingNumber = parseBookingNumber(process.env.NEXT_PUBLIC_BOOKING_WHATSAPP);
 
   const categories = [
     { id: "all", name: t.services.all },
@@ -80,14 +86,14 @@ export default function ServicesClient({ locale }: ServicesClientProps) {
   });
 
   const handleWhatsAppBooking = (serviceName: string) => {
-    const whatsappNum = locale === "ar" ? "+966551112233" : "+971508889900";
+    if (!bookingNumber) return;
     const text = locale === "ar"
       ? `مرحباً ذا بارون، أود حجز موعد لخدمة: ${serviceName}`
       : `Hi THE BARON, I'd like to book the service: ${serviceName}`;
-    window.open(`https://api.whatsapp.com/send?phone=${whatsappNum}&text=${encodeURIComponent(text)}`, "_blank");
+    window.open(`https://api.whatsapp.com/send?phone=${bookingNumber}&text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
   };
 
-  const activeRate = rates ? (rates[defaultCountry.currency] || 3.67) : 3.67;
+  const activeRate = getUsdRate(defaultCountry.currency, rates) ?? 1;
 
   if (loading) {
     return (
@@ -207,7 +213,9 @@ export default function ServicesClient({ locale }: ServicesClientProps) {
 
                   <button
                     onClick={() => handleWhatsAppBooking(service.name?.[locale] || service.name?.en)}
-                    className="inline-flex items-center gap-2 rounded-sm bg-bronze px-5 py-2.5 text-xs font-bold text-espresso-dark hover:bg-bronze-dark transition-all"
+                    disabled={!bookingNumber}
+                    title={!bookingNumber ? (locale === "ar" ? "الحجز غير متاح حالياً" : "Booking contact is not configured") : undefined}
+                    className="inline-flex items-center gap-2 rounded-sm bg-bronze px-5 py-2.5 text-xs font-bold text-espresso-dark hover:bg-bronze-dark transition-all disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     <MessageSquare className="h-3.5 w-3.5 fill-espresso-dark" />
                     <span>{t.services.bookWhatsapp}</span>
