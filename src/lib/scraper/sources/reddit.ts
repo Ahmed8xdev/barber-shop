@@ -33,7 +33,7 @@ export function extractPosts(json: unknown, sub: string): RedditTrend[] {
     const post = child?.data;
     if (typeof post?.title !== 'string' || !post.title.trim()) continue;
     if (typeof post?.permalink !== 'string' ||
-        !/^\\/r\\/[A-Za-z0-9_]+\\/comments\\/[A-Za-z0-9]+(?:\\/|$)/.test(post.permalink)) continue;
+        !/^\/r\/[A-Za-z0-9_]+\/comments\/[A-Za-z0-9]+(?:\/|$)/.test(post.permalink)) continue;
     const subreddit = typeof post.subreddit === 'string' &&
       /^[A-Za-z0-9_]{1,30}$/.test(post.subreddit) ? post.subreddit : sub;
     const seconds = typeof post.created_utc === 'number' &&
