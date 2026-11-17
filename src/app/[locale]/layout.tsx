@@ -24,10 +24,23 @@ const tajawal = Tajawal({
   weight: ["300", "400", "500", "700", "800"],
 });
 
-export const metadata: Metadata = {
-  title: "THE BARON | Global Grooming & Haircut Database",
-  description: "Explore the worldwide database of luxury haircuts, beard sculpting, and VIP pricing packages at THE BARON Lounge.",
-};
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  if (locale === "ar") {
+    return {
+      title: "ذا بارون | دليل قصات الشعر والعناية الشخصية",
+      description: "تصفح قصات الشعر والعناية باللحية والخدمات المتاحة في ذا بارون باللغة العربية.",
+    };
+  }
+  return {
+    title: "THE BARON | Grooming & Haircut Guide",
+    description: "Explore haircut styles, beard care, and grooming services at THE BARON in English.",
+  };
+}
 
 import LenisProvider from "@/components/LenisProvider";
 import PageTransition from "@/components/PageTransition";
