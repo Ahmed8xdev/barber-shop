@@ -1,4 +1,5 @@
 import { defaultCache } from './cache';
+import { mapWithConcurrency } from './concurrency';
 import { createHash } from 'node:crypto';
 import { getExchangeRates } from './sources/exchange-rates';
 import { fetchHairstyles } from './sources/wikipedia';
@@ -127,10 +128,16 @@ export async function getHaircuts(options: {
 
   const allStyles: HaircutItem[] = [];
 
-  const imagePromises = wikiResult.styles.map(s =>
-    getHaircutImages(s.title, 1).then(imgs => imgs[0] || '').catch(() => '')
-  );
-  const images = await Promise.all(imagePromises);
+  // Bound image provider fan-out: each style fans out to multiple sources.
+  // Processing all 30 Wikipedia styles simultaneously can issue ~150 requests.
+  const images = await mapWithConcurrency(wikiResult.styles, 3, async style => {
+    try {
+      const result = await getHaircutImages(style.title, 1);
+      return result[0] || '';
+    } catch {
+      return '';
+    }
+  });
 
   for (let i = 0; i < wikiResult.styles.length; i++) {
     const s = wikiResult.styles[i];
