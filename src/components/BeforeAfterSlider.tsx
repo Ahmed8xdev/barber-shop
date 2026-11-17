@@ -6,6 +6,7 @@ import { Scissors } from "lucide-react";
 
 export default function BeforeAfterSlider() {
   const [dragging, setDragging] = useState(false);
+  const [percent, setPercent] = useState(50);
   const containerRef = useRef<HTMLDivElement>(null);
   const rawX = useMotionValue(50);
   const x = useSpring(rawX, { stiffness: 300, damping: 30 });
@@ -15,8 +16,10 @@ export default function BeforeAfterSlider() {
     (clientX: number) => {
       if (!containerRef.current) return;
       const rect = containerRef.current.getBoundingClientRect();
+      if (!rect.width) return;
       const pos = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
       rawX.set(pos);
+      setPercent(Math.round(pos));
     },
     [rawX]
   );
@@ -30,6 +33,18 @@ export default function BeforeAfterSlider() {
     if (dragging) updatePosition(e.clientX);
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    let next = percent;
+    if (e.key === "ArrowLeft" || e.key === "ArrowDown") next = Math.max(0, percent - 5);
+    else if (e.key === "ArrowRight" || e.key === "ArrowUp") next = Math.min(100, percent + 5);
+    else if (e.key === "Home") next = 0;
+    else if (e.key === "End") next = 100;
+    else return;
+    e.preventDefault();
+    rawX.set(next);
+    setPercent(next);
+  };
+
   const handleMouseUp = () => setDragging(false);
 
   const handleTouchMove = (e: TouchEvent) => {
@@ -39,6 +54,14 @@ export default function BeforeAfterSlider() {
   return (
     <div
       ref={containerRef}
+      role="slider"
+      tabIndex={0}
+      aria-label="Before and after comparison"
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={percent}
+      aria-valuetext={`${percent}% after`}
+      onKeyDown={handleKeyDown}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
