@@ -85,8 +85,7 @@ function TestimonialCard({ t }: { t: Testimonial }) {
         &ldquo;{t.text}&rdquo;
       </p>
       <div className="flex items-center gap-2 text-[10px] text-sand-muted">
-        <Star className="h-3 w-3 fill-bronze text-bronze" />
-        <span>{t.score}</span>
+        <span>Reddit score: {t.score}</span>
       </div>
     </div>
   );
