@@ -95,10 +95,12 @@ export async function searchInnerTube(query: string, maxResults: number = 5): Pr
   return parseSearchResults(json, maxResults);
 }
 
-function parseSearchResults(json: any, maxResults: number): InnerTubeSearchResult[] {
+export function parseSearchResults(json: any, maxResults: number): InnerTubeSearchResult[] {
   try {
     const contents = json?.contents?.twoColumnSearchResultsRenderer?.primaryContents?.sectionListRenderer?.contents || [];
     const results: InnerTubeSearchResult[] = [];
+    const seen = new Set<string>();
+    const limit = Number.isFinite(maxResults) ? Math.max(1, Math.min(25, Math.trunc(maxResults))) : 5;
 
     for (const section of contents) {
       const items = section?.itemSectionRenderer?.contents || [];
@@ -106,7 +108,8 @@ function parseSearchResults(json: any, maxResults: number): InnerTubeSearchResul
         const video = item?.videoRenderer;
         if (!video) continue;
         const videoId = video.videoId;
-        if (!videoId) continue;
+        if (typeof videoId !== 'string' || !/^[A-Za-z0-9_-]{11}$/.test(videoId) || seen.has(videoId)) continue;
+        seen.add(videoId);
 
         results.push({
           title: video.title?.runs?.map((r: any) => r.text).join('') || 'Unknown',
@@ -117,9 +120,9 @@ function parseSearchResults(json: any, maxResults: number): InnerTubeSearchResul
           videoId,
         });
 
-        if (results.length >= maxResults) break;
+        if (results.length >= limit) break;
       }
-      if (results.length >= maxResults) break;
+      if (results.length >= limit) break;
     }
 
     return results;
