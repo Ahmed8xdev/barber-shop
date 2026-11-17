@@ -32,6 +32,12 @@ export class ScraperCache {
 
   constructor(config: Partial<CacheConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
+    if (!Number.isSafeInteger(this.config.maxEntries) || this.config.maxEntries < 1) {
+      throw new RangeError('Cache maxEntries must be a positive integer');
+    }
+    if (!Number.isFinite(this.config.staleTtlMs) || this.config.staleTtlMs < 0) {
+      throw new RangeError('Cache staleTtlMs must be a non-negative duration');
+    }
     if (this.config.enablePersistence) {
       this.ensurePersistDir();
       this.loadFromDisk();
@@ -81,9 +87,12 @@ export class ScraperCache {
       source,
     };
 
-    if (this.store.size >= this.config.maxEntries) {
-      const oldest = this.store.entries().next().value;
-      if (oldest) this.delete(oldest[0]);
+    // Updating an existing entry must not evict an unrelated key.
+    // Refresh its insertion order so the oldest *other* entry is evicted next.
+    const alreadyPresent = this.store.delete(key);
+    if (!alreadyPresent && this.store.size >= this.config.maxEntries) {
+      const oldest = this.store.keys().next().value;
+      if (oldest !== undefined) this.delete(oldest);
     }
 
     this.store.set(key, entry);
