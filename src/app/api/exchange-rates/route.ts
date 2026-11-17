@@ -12,7 +12,9 @@ export async function GET() {
       fetchedAt: data.fetchedAt,
     });
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : "Exchange rate fetch failed";
+    // Public API clients must never receive upstream credentials or error traces.
+    console.error("Exchange rates API error:", error);
+    const msg = "Exchange rates are temporarily unavailable";
     return NextResponse.json(
       { success: false, error: msg },
       { status: 502 }
