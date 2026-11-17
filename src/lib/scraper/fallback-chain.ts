@@ -4,37 +4,63 @@ export interface FallbackLayer<T> {
   timeoutMs?: number;
 }
 
+/**
+ * Use each provider at most once, accepting the first result meeting the
+ * threshold or the largest partial response when every provider falls short.
+ */
 export async function fallbackChain<T>(
   layers: FallbackLayer<T>[],
   minItems: number = 1
 ): Promise<{ data: T[]; source: string }> {
-  const errors: string[] = [];
+  if (!Number.isSafeInteger(minItems) || minItems < 1) {
+    throw new RangeError("minItems must be a positive integer");
+  }
+  if (layers.length === 0) return { data: [], source: "none" };
+
+  let best: { data: T[]; source: string } | null = null;
+  const errors: Error[] = [];
 
   for (const layer of layers) {
     try {
-      const result = await withTimeout(layer.fetch(), layer.timeoutMs || 8000);
-      if (result.length >= minItems) {
-        return { data: result, source: layer.name };
+      const timeoutMs = layer.timeoutMs ?? 8000;
+      // Never retry the final layer outside the loop or issue duplicate
+      // upstream requests when all providers return insufficient results.
+      const result = await withTimeout(layer.fetch(), timeoutMs);
+      if (!Array.isArray(result)) {
+        throw new TypeError(`${layer.name} returned a non-array result`);
       }
-      errors.push(`${layer.name}: returned ${result.length} items (need ${minItems})`);
-    } catch (err) {
-      errors.push(`${layer.name}: ${err instanceof Error ? err.message : String(err)}`);
+      if (result.length >= minItems) return { data: result, source: layer.name };
+      if (!best || result.length > best.data.length) {
+        best = { data: result, source: layer.name };
+      }
+    } catch (error) {
+      errors.push(error instanceof Error ? error : new Error(String(error)));
     }
   }
 
-  const lastLayer = layers[layers.length - 1];
-  const lastResult = await withTimeout(lastLayer.fetch(), lastLayer.timeoutMs || 8000);
-  return { data: lastResult, source: lastLayer.name };
+  if (best) return best;
+  if (errors.length) throw new AggregateError(errors, "All fallback providers failed");
+  return { data: [], source: "none" };
 }
 
-async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), ms);
+/**
+ * Promise.race enforces a deadline on our wait, even when a provider never
+ * settles. The provider itself must support AbortSignal for cancellation.
+ */
+export async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  if (!Number.isFinite(ms) || ms <= 0) {
+    throw new RangeError("Timeout must be a positive duration");
+  }
+  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    const result = await promise;
-    return result;
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`Provider timed out after ${ms}ms`)), ms);
+      }),
+    ]);
   } finally {
-    clearTimeout(timer);
+    if (timer) clearTimeout(timer);
   }
 }
 
