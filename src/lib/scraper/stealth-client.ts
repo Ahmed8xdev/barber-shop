@@ -68,46 +68,39 @@ export interface FetchWithRetryOptions {
 }
 
 export async function stealthFetch(options: FetchWithRetryOptions): Promise<Response> {
-  const { url, retries = 3, baseDelayMs = 500, timeoutMs = 8000 } = options;
+  const { url } = options;
+  // A misconfigured caller must never produce an unbounded number of requests.
+  const retries = Number.isSafeInteger(options.retries) ? Math.max(0, Math.min(3, options.retries!)) : 2;
+  const baseDelayMs = Number.isFinite(options.baseDelayMs) && (options.baseDelayMs ?? 0) >= 0
+    ? Math.min(5000, options.baseDelayMs!) : 500;
+  const timeoutMs = Number.isFinite(options.timeoutMs) && (options.timeoutMs ?? 0) > 0
+    ? Math.min(30000, options.timeoutMs!) : 8000;
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      const headers = buildStealthHeaders();
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
+      // AbortSignal.timeout releases its timer with the request lifecycle.
+      // The previous manual timer leaked whenever fetch() rejected.
       const res = await fetch(url, {
-        headers,
-        signal: controller.signal,
+        headers: buildStealthHeaders(),
+        signal: AbortSignal.timeout(timeoutMs),
       });
-      clearTimeout(timeoutId);
-
       if (res.ok) return res;
 
-      if (res.status === 429 || res.status === 403) {
-        lastError = new Error(`HTTP ${res.status}`);
-        const delay = baseDelayMs * Math.pow(2, attempt) + Math.random() * baseDelayMs * 0.3;
-        await new Promise(r => setTimeout(r, delay));
-        continue;
-      }
-
-      if (res.status >= 500) {
-        lastError = new Error(`HTTP ${res.status}`);
-        const delay = baseDelayMs * Math.pow(2, attempt) + Math.random() * baseDelayMs * 0.3;
-        await new Promise(r => setTimeout(r, delay));
-        continue;
-      }
-
-      return res;
-    } catch (err) {
-      lastError = err instanceof Error ? err : new Error(String(err));
-      if (attempt < retries) {
-        const delay = baseDelayMs * Math.pow(2, attempt) + Math.random() * baseDelayMs * 0.3;
-        await new Promise(r => setTimeout(r, delay));
-      }
+      // Permission failures (403) and other 4xx statuses should not be
+      // retried automatically. Retry only rate limiting or server outages.
+      const retryable = res.status === 429 || res.status >= 500;
+      if (!retryable) return res;
+      lastError = new Error(`HTTP ${res.status}`);
+      if (attempt === retries) break;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      if (attempt === retries) break;
     }
-  }
 
+    const delay = Math.min(10000, baseDelayMs * Math.pow(2, attempt))
+      + Math.random() * baseDelayMs * 0.3;
+    await new Promise(resolve => setTimeout(resolve, delay));
+  }
   throw lastError || new Error("Fetch failed after retries");
 }
