@@ -3,7 +3,7 @@ name: Scraper reliability tests
 on:
   pull_request:
     paths:
-      - 'src/lib/scraper/**'
+      - 'src/**'
       - 'src/app/api/**'
       - 'tests/**'
       - '.github/workflows/scraper-tests.yml'
@@ -33,5 +33,7 @@ jobs:
           cache: npm
       - name: Install locked dependencies without package scripts
         run: npm ci --ignore-scripts
-      - name: Test rate limiting and HTTP retry behavior
+      - name: Test scraper and API regressions
         run: node --test tests/*.test.cjs
+      - name: Check complete TypeScript application
+        run: npx tsc --noEmit --incremental false
