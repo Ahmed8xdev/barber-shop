@@ -1,4 +1,5 @@
 import { defaultCache } from '../cache';
+import { createHash } from 'node:crypto';
 
 const CACHE_TTL_MS = 86400_000;
 const FETCH_TIMEOUT_MS = 10000;
@@ -26,17 +27,28 @@ async function fetchWithHeaders(url: string, extra?: RequestInit): Promise<Respo
   }
 }
 
+export function normalizeImageCount(count: number): number {
+  if (!Number.isFinite(count)) return 5;
+  return Math.max(1, Math.min(10, Math.trunc(count)));
+}
+
+export function makeImageCacheKey(query: string, count: number): string {
+  const identity = JSON.stringify([query.trim().toLowerCase(), normalizeImageCount(count)]);
+  return 'images_v2_' + createHash('sha256').update(identity).digest('hex');
+}
+
 export async function getHaircutImages(query: string, count: number = 5): Promise<string[]> {
-  const cacheKey = `images_${query.toLowerCase().replace(/\s+/g, '_')}`;
+  const requestedCount = normalizeImageCount(count);
+  const cacheKey = makeImageCacheKey(query, requestedCount);
   const cached = defaultCache.get<string[]>(cacheKey);
-  if (cached && !cached.stale) return cached.data;
+  if (cached && !cached.stale) return cached.data.slice(0, requestedCount);
 
   const results = await Promise.allSettled([
-    searchWikimediaCommons(query, count),
-    searchDuckDuckGo(query, count),
-    searchPexels(query, count),
-    searchGoogleImages(query, count),
-    searchOpenverse(query, count),
+    searchWikimediaCommons(query, requestedCount),
+    searchDuckDuckGo(query, requestedCount),
+    searchPexels(query, requestedCount),
+    searchGoogleImages(query, requestedCount),
+    searchOpenverse(query, requestedCount),
   ]);
 
   const allUrls: string[] = [];
@@ -46,7 +58,7 @@ export async function getHaircutImages(query: string, count: number = 5): Promis
     }
   }
 
-  const unique = [...new Set(allUrls)].slice(0, count);
+  const unique = [...new Set(allUrls)].slice(0, requestedCount);
   if (unique.length > 0) {
     defaultCache.set(cacheKey, unique, 'images', CACHE_TTL_MS);
   }
