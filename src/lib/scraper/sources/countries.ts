@@ -83,41 +83,79 @@ const ARABIC_NAMES: Record<string, string> = {
   'Hong Kong': 'هونغ كونغ',
 };
 
+/** Accept only valid country/currency identifiers and readable names. */
+export function parseLegacyCountries(data: unknown): CountryData[] {
+  if (!Array.isArray(data)) return [];
+  return data.flatMap((item: APICountry) => {
+    if (!item || typeof item.alpha2Code !== 'string' ||
+        !/^[A-Za-z]{2}$/.test(item.alpha2Code) ||
+        typeof item.name !== 'string' || !item.name.trim() ||
+        !Array.isArray(item.currencies)) return [];
+    const currency = item.currencies.find(c => c && typeof c.code === 'string' && /^[A-Z]{3}$/.test(c.code));
+    if (!currency?.code) return [];
+    return [{
+      code: item.alpha2Code.toUpperCase(),
+      name: { en: item.name.trim(), ar: ARABIC_NAMES[item.name] || item.name.trim() },
+      currency: currency.code,
+      symbol: typeof currency.symbol === 'string' && currency.symbol.length <= 8 ? currency.symbol : currency.code,
+    }];
+  });
+}
+
+interface RestCountry {
+  cca2?: string;
+  name?: { common?: string };
+  currencies?: Record<string, { name?: string; symbol?: string }>;
+}
+
+export function parseRestCountries(data: unknown): CountryData[] {
+  if (!Array.isArray(data)) return [];
+  return data.flatMap((country: RestCountry) => {
+    const code = country?.cca2;
+    const name = country?.name?.common;
+    if (!code || !/^[A-Za-z]{2}$/.test(code) || !name || !country.currencies) return [];
+    const currencyCode = Object.keys(country.currencies).find(key => /^[A-Z]{3}$/.test(key));
+    if (!currencyCode) return [];
+    const symbol = country.currencies[currencyCode]?.symbol;
+    return [{
+      code: code.toUpperCase(),
+      name: { en: name, ar: ARABIC_NAMES[name] || name },
+      currency: currencyCode,
+      symbol: typeof symbol === 'string' && symbol.length <= 8 ? symbol : currencyCode,
+    }];
+  });
+}
+
+async function fetchProvider(url: string): Promise<unknown> {
+  const response = await fetch(url, {
+    headers: { 'Accept': 'application/json', 'User-Agent': 'BarberShop/1.0' },
+    signal: AbortSignal.timeout(8000),
+  });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return response.json();
+}
+
 export async function fetchCountries(): Promise<CountryData[]> {
-  const cacheKey = 'countries_data_v2';
+  const cacheKey = 'countries_data_v3';
   const cached = defaultCache.get<CountryData[]>(cacheKey);
   if (cached && !cached.stale) return cached.data;
 
-  try {
-    const res = await fetch('https://www.apicountries.com/countries', {
-      headers: { 'User-Agent': 'BarberShop/1.0' },
-      signal: AbortSignal.timeout(8000),
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json() as APICountry[];
-
-    const countries: CountryData[] = data
-      .filter(c => c.alpha2Code && c.currencies?.[0]?.code)
-      .map(c => {
-        const currency = c.currencies![0];
-        return {
-          code: c.alpha2Code,
-          name: {
-            en: c.name,
-            ar: ARABIC_NAMES[c.name] || c.name,
-          },
-          currency: currency.code || '',
-          symbol: currency.symbol || currency.code || '',
-        };
-      });
-
-    if (countries.length > 0) {
-      defaultCache.set(cacheKey, countries, 'apicountries', CACHE_TTL_MS);
+  const providers = [
+    { url: 'https://www.apicountries.com/countries', parse: parseLegacyCountries, name: 'apicountries' },
+    { url: 'https://restcountries.com/v3.1/all?fields=cca2,name,currencies', parse: parseRestCountries, name: 'restcountries' },
+  ];
+  for (const provider of providers) {
+    try {
+      const countries = provider.parse(await fetchProvider(provider.url));
+      if (countries.length === 0) continue;
+      const unique = [...new Map(countries.map(country => [country.code, country])).values()];
+      unique.sort((a, b) => a.name.en.localeCompare(b.name.en));
+      defaultCache.set(cacheKey, unique, provider.name, CACHE_TTL_MS);
+      return unique;
+    } catch {
+      // Use the next independent provider instead of returning no countries.
     }
-
-    return countries;
-  } catch {
-    const stale = defaultCache.get<CountryData[]>(cacheKey);
-    return stale?.data || [];
   }
+  const stale = defaultCache.get<CountryData[]>(cacheKey);
+  return stale?.data || [];
 }
