@@ -1,4 +1,5 @@
 import { defaultCache } from '../cache';
+import { createHash } from 'node:crypto';
 import { buildStealthHeaders } from '../stealth-client';
 
 const CACHE_TTL_MS = 21600_000;
@@ -49,10 +50,42 @@ function formatViews(n: number): string {
   return String(n);
 }
 
+export function invidiousCacheKey(query: string, maxResults: number): string {
+  const count = Number.isFinite(maxResults) ? Math.max(1, Math.min(25, Math.trunc(maxResults))) : 10;
+  const identity = JSON.stringify([query.trim().toLowerCase(), count]);
+  return 'invidious_v2_' + createHash('sha256').update(identity).digest('hex');
+}
+
+export function normalizeInvidiousLimit(maxResults: number): number {
+  return Number.isFinite(maxResults) ? Math.max(1, Math.min(25, Math.trunc(maxResults))) : 10;
+}
+
+export function parseInvidiousVideos(data: unknown, maxResults: number): SearchResult[] {
+  if (!Array.isArray(data)) return [];
+  const seen = new Set<string>();
+  const results: SearchResult[] = [];
+  const limit = normalizeInvidiousLimit(maxResults);
+  for (const v of data) {
+    if (!v || typeof v !== 'object' || typeof v.videoId !== 'string') continue;
+    if (!/^[A-Za-z0-9_-]{11}$/.test(v.videoId) || seen.has(v.videoId)) continue;
+    seen.add(v.videoId);
+    results.push({
+      title: typeof v.title === 'string' ? v.title : 'Unknown',
+      channel: typeof v.author === 'string' ? v.author : '',
+      views: formatViews(typeof v.viewCount === 'number' && Number.isFinite(v.viewCount) && v.viewCount > 0 ? v.viewCount : 0),
+      url: `https://youtube.com/watch?v=${v.videoId}`,
+      thumbnail: `https://img.youtube.com/vi/${v.videoId}/mqdefault.jpg`,
+    });
+    if (results.length === limit) break;
+  }
+  return results;
+}
+
 export async function searchInvidious(query: string, maxResults: number = 10): Promise<SearchResult[]> {
-  const cacheKey = `invidious_${query.toLowerCase().replace(/\s+/g, '_')}`;
+  const limit = normalizeInvidiousLimit(maxResults);
+  const cacheKey = invidiousCacheKey(query, limit);
   const cached = defaultCache.get<SearchResult[]>(cacheKey);
-  if (cached && !cached.stale) return cached.data;
+  if (cached && !cached.stale) return cached.data.slice(0, limit);
 
   const envInstances = process.env.INVIDIOUS_INSTANCES;
   const instances = envInstances
@@ -78,15 +111,8 @@ export async function searchInvidious(query: string, maxResults: number = 10): P
           const text = await res.text();
           let data: any[];
           try { data = JSON.parse(text); } catch { continue; }
-          if (!Array.isArray(data) || data.length === 0) continue;
-
-          const results: SearchResult[] = data.slice(0, maxResults).map((v: any) => ({
-            title: v.title || 'Unknown',
-            channel: v.author || '',
-            views: formatViews(v.viewCount || 0),
-            url: `https://youtube.com/watch?v=${v.videoId}`,
-            thumbnail: `https://img.youtube.com/vi/${v.videoId}/mqdefault.jpg`,
-          }));
+          const results = parseInvidiousVideos(data, limit);
+          if (results.length === 0) continue;
 
           if (results.length > 0) {
             defaultCache.set(cacheKey, results, 'invidious', CACHE_TTL_MS);
