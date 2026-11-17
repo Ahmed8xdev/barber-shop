@@ -28,6 +28,9 @@ test('a hanging fetch is aborted by the timeout signal',async()=>{
  global.fetch=async(_,options)=>new Promise((_,reject)=>{
   options.signal.addEventListener('abort',()=>{aborted=true;reject(Error('aborted'))},{once:true});
  });
+ // AbortSignal.timeout uses an unref'ed timer; a mocked fetch has no
+ // underlying socket to keep the test process alive until it fires.
+ const keepAlive=setTimeout(()=>{},100);
  try{await assert.rejects(stealthFetch({url:'https://example.test',retries:0,timeoutMs:10}),/aborted/);assert.equal(aborted,true);}
- finally{global.fetch=prev;}
+ finally{clearTimeout(keepAlive);global.fetch=prev;}
 });
