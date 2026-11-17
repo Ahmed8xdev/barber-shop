@@ -24,18 +24,29 @@ const SOURCES = [
   { name: 'www.reddit.com', url: (sub: string) => `https://www.reddit.com/r/${sub}/hot.json?limit=15&raw_json=1` },
 ];
 
-function extractPosts(json: any, sub: string): RedditTrend[] {
-  const children = json?.data?.children || [];
-  return children
-    .map((c: any) => c.data)
-    .filter((p: any) => p?.title && p?.permalink)
-    .map((p: any) => ({
-      title: p.title.trim(),
-      subreddit: p.subreddit || sub,
-      score: p.score || 0,
-      url: `https://reddit.com${p.permalink}`,
-      created: (p.created_utc || 0) * 1000,
-    }));
+export function extractPosts(json: unknown, sub: string): RedditTrend[] {
+  const root = json as { data?: { children?: unknown } } | null;
+  const children = root?.data?.children;
+  if (!Array.isArray(children)) return [];
+  const parsed: RedditTrend[] = [];
+  for (const child of children) {
+    const post = child?.data;
+    if (typeof post?.title !== 'string' || !post.title.trim()) continue;
+    if (typeof post?.permalink !== 'string' ||
+        !/^\/r\/[A-Za-z0-9_]+\/comments\/[A-Za-z0-9]+(?:\/|$)/.test(post.permalink)) continue;
+    const subreddit = typeof post.subreddit === 'string' &&
+      /^[A-Za-z0-9_]{1,30}$/.test(post.subreddit) ? post.subreddit : sub;
+    const seconds = typeof post.created_utc === 'number' &&
+      Number.isFinite(post.created_utc) && post.created_utc >= 0 ? post.created_utc : 0;
+    parsed.push({
+      title: post.title.trim(),
+      subreddit,
+      score: typeof post.score === 'number' && Number.isFinite(post.score) ? post.score : 0,
+      url: `https://www.reddit.com${post.permalink}`,
+      created: seconds * 1000,
+    });
+  }
+  return parsed;
 }
 
 export async function fetchRedditTrends(): Promise<RedditTrend[]> {
