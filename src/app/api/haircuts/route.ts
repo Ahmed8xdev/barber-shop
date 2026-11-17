@@ -35,7 +35,8 @@ export async function GET(request: Request) {
 
   } catch (error: unknown) {
     console.error("Haircuts API error:", error);
-    const msg = error instanceof Error ? error.message : "Failed to fetch live data";
+    // Do not expose upstream URLs, tokens, or internal exception details to clients.
+    const msg = "Haircut data is temporarily unavailable";
     return NextResponse.json(
       { success: false, error: msg },
       { status: 502 }
