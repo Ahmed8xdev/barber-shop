@@ -34,3 +34,18 @@ test('currency API does not disclose provider credentials',async()=>{
  assert.equal(r.body.error,'Exchange rates are temporarily unavailable');
  }finally{console.error=prev;}
 });
+
+test('haircut detail API redacts upstream credentials in failed requests',async()=>{
+ const prev=console.error;console.error=()=>{};
+ try{
+ const get=load('haircuts/[id]',{
+  '@/lib/scraper':{getHaircuts:async()=>{throw Error('https://provider.test?api_key=verysecret')},getExchangeRates:async()=>null},
+  '@/lib/currency-rates':{getUsdRate:()=>1},
+ });
+ const r=await get(new Request('https://example.test/api/haircuts/abc'),{params:Promise.resolve({id:'abc'})});
+ assert.equal(r.status,502);
+ assert.equal(r.body.success,false);
+ assert.equal(r.body.error,'Haircut details are temporarily unavailable');
+ assert.ok(!JSON.stringify(r.body).includes('verysecret'));
+ }finally{console.error=prev;}
+});
