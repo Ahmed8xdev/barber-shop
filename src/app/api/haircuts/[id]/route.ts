@@ -50,7 +50,9 @@ export async function GET(
     });
 
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : "Failed to fetch haircut details";
+    // Errors may include upstream URLs, tokens, or internal details. Do not send them to clients.
+    console.error("Haircut detail API error:", error);
+    const msg = "Haircut details are temporarily unavailable";
     return NextResponse.json(
       { success: false, error: msg },
       { status: 502 }
