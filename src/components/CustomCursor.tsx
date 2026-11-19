@@ -12,14 +12,18 @@ export default function CustomCursor() {
     const ring = ringRef.current;
     if (!dot || !ring) return;
 
-    let mouseX = 0;
-    let mouseY = 0;
+    // quickTo reuses its tween; allocating two new gsap.to instances on
+    // every mousemove creates unnecessary animation work on high-Hz mice.
+    const dotX = gsap.quickTo(dot, "x", { duration: 0.05, ease: "power2.out" });
+    const dotY = gsap.quickTo(dot, "y", { duration: 0.05, ease: "power2.out" });
+    const ringX = gsap.quickTo(ring, "x", { duration: 0.25, ease: "power2.out" });
+    const ringY = gsap.quickTo(ring, "y", { duration: 0.25, ease: "power2.out" });
 
     const onMouse = (e: MouseEvent) => {
-      mouseX = e.clientX;
-      mouseY = e.clientY;
-      gsap.to(dot, { x: mouseX, y: mouseY, duration: 0.05, ease: "power2.out" });
-      gsap.to(ring, { x: mouseX, y: mouseY, duration: 0.25, ease: "power2.out" });
+      dotX(e.clientX);
+      dotY(e.clientY);
+      ringX(e.clientX);
+      ringY(e.clientY);
     };
 
     const onDown = () => {
@@ -40,6 +44,9 @@ export default function CustomCursor() {
       window.removeEventListener("mousemove", onMouse);
       window.removeEventListener("mousedown", onDown);
       window.removeEventListener("mouseup", onUp);
+      // Clear live tweens on unmount to avoid animation work after navigation.
+      gsap.killTweensOf(dot);
+      gsap.killTweensOf(ring);
     };
   }, []);
 
