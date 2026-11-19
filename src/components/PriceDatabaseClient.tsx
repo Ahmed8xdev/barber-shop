@@ -68,14 +68,21 @@ export default function PriceDatabaseClient({ locale }: PriceDatabaseClientProps
   const allHaircutsRef = useRef(allHaircuts);
   allHaircutsRef.current = allHaircuts;
 
+  // Ignore pagination responses for a locale that is no longer active.
+  const activeLocaleRef = useRef(locale);
+  activeLocaleRef.current = locale;
+
   useEffect(() => {
+    const controller = new AbortController();
     async function fetchAPI() {
       try {
         setLoading(true);
+        setError(null);
         const params = new URLSearchParams({ limit: "30", locale });
-        const res = await fetch(`/api/haircuts?${params}`);
+        const res = await fetch(`/api/haircuts?${params}`, { signal: controller.signal });
         if (!res.ok) throw new Error("Failed to contact internal pricing API");
         const payload = await res.json();
+        if (controller.signal.aborted) return;
         if (payload.success) {
           setAllHaircuts(payload.haircuts);
           setRates(payload.rates);
@@ -88,13 +95,15 @@ export default function PriceDatabaseClient({ locale }: PriceDatabaseClientProps
           throw new Error("API responded with unsuccessful operation status");
         }
       } catch (err: unknown) {
+        if (controller.signal.aborted) return;
         console.error("Pricing database fetch failed:", err);
         setError(err instanceof Error ? err.message : "Unknown retrieval error occurred");
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     }
-    fetchAPI();
+    void fetchAPI();
+    return () => controller.abort();
   }, [locale]);
 
   const supportedCountries = useMemo(() => {
@@ -155,12 +164,13 @@ export default function PriceDatabaseClient({ locale }: PriceDatabaseClientProps
 
   const fetchNextPage = useCallback(async () => {
     const cursor = nextContinueRef.current;
-    if (!cursor) return false;
+    if (!cursor || activeLocaleRef.current !== locale) return false;
     try {
       const params = new URLSearchParams({ limit: "30", locale, continue: cursor });
       const res = await fetch(`/api/haircuts?${params}`);
       if (!res.ok) return false;
       const payload = await res.json();
+      if (activeLocaleRef.current !== locale) return false;
       if (payload.success && payload.haircuts?.length > 0) {
         setAllHaircuts(prev => appendUniqueById(prev, payload.haircuts));
         const nextCursor = nextPageCursor(cursor, payload.nextContinue, payload.haircuts.length);
@@ -182,11 +192,13 @@ export default function PriceDatabaseClient({ locale }: PriceDatabaseClientProps
     const totalFiltered = filteredServices.length;
     const nextCount = currentVisible + 6;
 
+    let canAdvance = true;
     if (nextCount > totalFiltered && nextContinueRef.current) {
-      await fetchNextPage();
+      canAdvance = await fetchNextPage();
     }
 
-    setVisibleCount(prev => Math.max(prev + 6, nextCount));
+    // A failed page load must not silently advance the visible count.
+    if (canAdvance) setVisibleCount(prev => Math.max(prev + 6, nextCount));
     setFetchingMore(false);
   };
 
