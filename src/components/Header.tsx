@@ -37,6 +37,16 @@ export default function Header() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  // Keyboard users must be able to dismiss the expanded mobile menu.
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMobileMenuOpen(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [mobileMenuOpen]);
+
   return (
     <header
       className={`sticky top-0 z-50 w-full transition-all duration-300 ${
@@ -102,7 +112,11 @@ export default function Header() {
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             className="p-2 text-sand-muted hover:text-bronze focus:outline-none"
-            aria-label="Toggle Menu"
+            aria-controls="mobile-navigation"
+            aria-expanded={mobileMenuOpen}
+            aria-label={mobileMenuOpen
+              ? (currentLocale === "ar" ? "إغلاق القائمة" : "Close menu")
+              : (currentLocale === "ar" ? "فتح القائمة" : "Open menu")}
           >
             {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
           </button>
@@ -110,7 +124,7 @@ export default function Header() {
       </div>
 
       {mobileMenuOpen && (
-        <div className="md:hidden border-b border-bronze/15 bg-white animate-fade-in">
+        <div id="mobile-navigation" role="navigation" aria-label={currentLocale === "ar" ? "التنقل الأساسي" : "Mobile primary navigation"} className="md:hidden border-b border-bronze/15 bg-white animate-fade-in">
           <div className="space-y-1 px-4 py-4 pb-6">
             {navLinks.map((link) => (
               <Link
