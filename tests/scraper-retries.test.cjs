@@ -112,3 +112,25 @@ test('nonretryable errors and invalid JSON each release exactly one slot', async
     assert.equal(limiter.backoffs, 0);
   } finally { global.fetch = old; }
 });
+
+test('invalid retry and timeout options preserve bounded useful defaults', async () => {
+  const oldFetch = global.fetch;
+  const limiter = limiterStub();
+  let count = 0;
+  global.fetch = async () => {
+    count++;
+    return count === 1
+      ? { ok: false, status: 429, statusText: 'Too Many Requests' }
+      : { ok: true, status: 200, async json() { return { ok: true }; } };
+  };
+  try {
+    const result = await new HttpClient(limiter).fetch('https://example.org/anything', {
+      maxRetries: NaN,
+      timeoutMs: -100,
+    });
+    assert.equal(result.data.ok, true);
+    assert.equal(count, 2);
+    assert.equal(limiter.acquired, 2);
+    assert.equal(limiter.released, 2);
+  } finally { global.fetch = oldFetch; }
+});

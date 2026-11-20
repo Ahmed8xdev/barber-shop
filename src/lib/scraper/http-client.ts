@@ -25,12 +25,16 @@ export class HttpClient {
   ): Promise<{ ok: boolean; status: number; data: T }> {
     const domain = new URL(url).hostname;
     // Every request gets a bounded number of attempts to avoid unending recursion.
-    const maxRetries = Math.min(3, Math.max(0, Math.trunc(options.maxRetries ?? 2)));
+    const maxRetries = Number.isFinite(options.maxRetries)
+      ? Math.min(3, Math.max(0, Math.trunc(options.maxRetries!)))
+      : 2;
+    const timeoutMs = Number.isFinite(options.timeoutMs) && (options.timeoutMs ?? 0) > 0
+      ? Math.min(30000, options.timeoutMs!) : 15000;
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       await this.rateLimiter.acquire(domain);
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? 15000);
+      const timeout = setTimeout(() => controller.abort(), timeoutMs);
       let retryableResponse = false;
 
       try {
