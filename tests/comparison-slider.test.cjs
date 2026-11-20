@@ -15,3 +15,11 @@ test('mouse position updates the accessible value and handles zero width',()=>{
  assert.ok(body.includes('if (!rect.width) return'));
  assert.ok(body.includes('setPercent(Math.round(pos))'));
 });
+
+test('divider follows the same percentage scale as image clipping',()=>{
+ assert.ok(body.includes('const dividerLeft = useTransform(x, (v) => `${v}%`)'));
+ assert.ok(body.includes('const afterClip = useTransform(x, (v) => `inset(0 ${100 - v}% 0 0)`)'));
+ assert.ok(body.includes('style={{ left: dividerLeft }}'));
+ assert.ok(body.includes('style={{ clipPath: afterClip }}'));
+ assert.ok(!body.includes('style={{ left: x }}'));
+});

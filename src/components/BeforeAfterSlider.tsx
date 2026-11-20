@@ -10,7 +10,10 @@ export default function BeforeAfterSlider() {
   const containerRef = useRef<HTMLDivElement>(null);
   const rawX = useMotionValue(50);
   const x = useSpring(rawX, { stiffness: 300, damping: 30 });
-  const clipRight = useTransform(x, (v) => `${100 - v}%`);
+  // Framer Motion interprets a bare numeric CSS left value as pixels.
+  // Use percentages to align the divider with the clipped image at every width.
+  const dividerLeft = useTransform(x, (v) => `${v}%`);
+  const afterClip = useTransform(x, (v) => `inset(0 ${100 - v}% 0 0)`);
 
   const updatePosition = useCallback(
     (clientX: number) => {
@@ -84,7 +87,7 @@ export default function BeforeAfterSlider() {
       {/* After (clipped) */}
       <motion.div
         className="absolute inset-0 bg-[#1C1612] flex items-center justify-center"
-        style={{ clipPath: useTransform(x, (v) => `inset(0 ${100 - v}% 0 0)`) }}
+        style={{ clipPath: afterClip }}
       >
         <motion.div
           className="text-center space-y-2"
@@ -99,7 +102,7 @@ export default function BeforeAfterSlider() {
       {/* Divider line */}
       <motion.div
         className="absolute top-0 bottom-0 w-0.5 bg-bronze z-20 pointer-events-none"
-        style={{ left: x }}
+        style={{ left: dividerLeft }}
       >
         <motion.div
           className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 h-10 w-10 rounded-full border-2 border-bronze bg-espresso-dark flex items-center justify-center shadow-xl"
